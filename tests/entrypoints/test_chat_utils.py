@@ -5,8 +5,10 @@ import warnings
 from collections.abc import Mapping
 from typing import Literal
 
+import numpy as np
 import pytest
 from mistral_common.tokens.tokenizers.base import SpecialTokenPolicy
+from PIL import Image
 
 from vllm.assets.audio import AudioAsset
 from vllm.assets.image import ImageAsset
@@ -2202,6 +2204,40 @@ def test_apply_mistral_chat_template_thinking_chunk():
         r"[INST]What is 2+2?[/INST]"
         r"Let me think about it.[THINK]2+2 = 4[/THINK]The answer is 4.</s>"
         r"[INST]Thanks, what is 3+3?[/INST]"
+    )
+
+    assert string_tokens == expected_tokens
+
+
+def test_apply_mistral_chat_template_image_pil():
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": "Describe this image."},
+                {
+                    "type": "image_pil",
+                    "image_pil": Image.fromarray(
+                        np.array([[125, 125], [125, 125]], dtype=np.uint8)
+                    ),
+                },
+            ],
+        }
+    ]
+    mistral_tokenizer = MistralTokenizer.from_pretrained(
+        "mistralai/Magistral-Small-2509"
+    )
+
+    tokens_ids = apply_mistral_chat_template(
+        mistral_tokenizer, messages, chat_template=None, tools=None
+    )
+
+    string_tokens = mistral_tokenizer.mistral.decode(
+        tokens_ids, special_token_policy=SpecialTokenPolicy.KEEP
+    )
+
+    expected_tokens = (
+        r"<s>[INST]Describe this image.\n<|vision_start|><|IMAGE|><|vision_end|>[/INST]"
     )
 
     assert string_tokens == expected_tokens
